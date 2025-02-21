@@ -18,6 +18,8 @@ import { LangGraphEvent } from "../../agents/langgraph/events";
 import { execute } from "./remote-lg-action";
 import { CopilotKitError, CopilotKitLowLevelError } from "@copilotkit/shared";
 import { CopilotKitApiDiscoveryError, ResolvedCopilotKitError } from "@copilotkit/shared";
+import { parseJson, tryMap } from "@copilotkit/shared";
+import { ActionInput } from "../../graphql/inputs/action.input";
 
 export function constructLGCRemoteAction({
   endpoint,
@@ -55,10 +57,12 @@ export function constructLGCRemoteAction({
       });
 
       let state = {};
+      let configurable = {};
       if (agentStates) {
-        const jsonState = agentStates.find((state) => state.agentName === name)?.state;
+        const jsonState = agentStates.find((state) => state.agentName === name);
         if (jsonState) {
-          state = JSON.parse(jsonState);
+          state = parseJson(jsonState.state, {});
+          configurable = parseJson(jsonState.configurable, {});
         }
       }
 
@@ -72,11 +76,12 @@ export function constructLGCRemoteAction({
           nodeName,
           messages: [...messages, ...additionalMessages],
           state,
+          configurable,
           properties: graphqlContext.properties,
-          actions: actionInputsWithoutAgents.map((action) => ({
+          actions: tryMap(actionInputsWithoutAgents, (action: ActionInput) => ({
             name: action.name,
             description: action.description,
-            parameters: JSON.parse(action.jsonSchema) as string,
+            parameters: JSON.parse(action.jsonSchema),
           })),
           metaEvents,
         });
@@ -196,10 +201,12 @@ export function constructRemoteActions({
           });
 
           let state = {};
+          let configurable = {};
           if (agentStates) {
-            const jsonState = agentStates.find((state) => state.agentName === name)?.state;
+            const jsonState = agentStates.find((state) => state.agentName === name);
             if (jsonState) {
-              state = JSON.parse(jsonState);
+              state = parseJson(jsonState.state, {});
+              configurable = parseJson(jsonState.configurable, {});
             }
           }
 
@@ -214,8 +221,9 @@ export function constructRemoteActions({
                 nodeName,
                 messages: [...messages, ...additionalMessages],
                 state,
+                configurable,
                 properties: graphqlContext.properties,
-                actions: actionInputsWithoutAgents.map((action) => ({
+                actions: tryMap(actionInputsWithoutAgents, (action: ActionInput) => ({
                   name: action.name,
                   description: action.description,
                   parameters: JSON.parse(action.jsonSchema),

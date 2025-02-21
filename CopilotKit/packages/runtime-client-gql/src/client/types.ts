@@ -12,6 +12,7 @@ import {
   MetaEventName,
   CopilotKitLangGraphInterruptEvent as GqlCopilotKitLangGraphInterruptEvent,
 } from "../graphql/@generated/graphql";
+import { parseJson } from "@copilotkit/shared";
 
 type MessageType = "TextMessage" | "ActionExecutionMessage" | "ResultMessage" | "AgentStateMessage";
 
@@ -95,11 +96,7 @@ export class ResultMessage extends Message implements ResultMessageConstructorOp
   }
 
   static decodeResult(result: string): any {
-    try {
-      return JSON.parse(result);
-    } catch (e) {
-      return result;
-    }
+    return parseJson(result, result);
   }
 
   static encodeResult(result: any): string {
@@ -135,9 +132,10 @@ export function langGraphInterruptEvent(
   return { ...eventProps, name: MetaEventName.LangGraphInterruptEvent, type: "MetaEvent" };
 }
 
-type LangGraphInterruptEvent<TValue extends any = any> = GqlLangGraphInterruptEvent & {
+export type LangGraphInterruptEvent<TValue extends any = any> = GqlLangGraphInterruptEvent & {
   value: TValue;
 };
+
 type CopilotKitLangGraphInterruptEvent<TValue extends any = any> =
   GqlCopilotKitLangGraphInterruptEvent & {
     data: GqlCopilotKitLangGraphInterruptEvent["data"] & { value: TValue };

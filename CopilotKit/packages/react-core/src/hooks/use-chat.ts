@@ -40,6 +40,7 @@ import {
   LangGraphInterruptEvent,
   MetaEventInput,
 } from "@copilotkit/runtime-client-gql";
+import { parseJson } from "@copilotkit/shared";
 
 export type UseChatOptions = {
   /**
@@ -318,6 +319,7 @@ export function useChat(options: UseChatOptions): UseChatHelpers {
             agentStates: Object.values(coagentStatesRef.current!).map((state) => ({
               agentName: state.name,
               state: JSON.stringify(state.state),
+              configurable: JSON.stringify(state.configurable ?? {}),
             })),
             forwardedParameters: options.forwardedParameters || {},
           },
@@ -376,10 +378,7 @@ export function useChat(options: UseChatOptions): UseChatHelpers {
           (value.generateCopilotResponse?.metaEvents ?? []).forEach((ev) => {
             if (ev.name === MetaEventName.LangGraphInterruptEvent) {
               let eventValue = langGraphInterruptEvent(ev as LangGraphInterruptEvent).value;
-              try {
-                eventValue = JSON.parse(eventValue);
-                // In case of unparsable string, we keep the event as is
-              } catch (e) {}
+              eventValue = parseJson(eventValue, eventValue);
               setLangGraphInterruptAction({
                 event: {
                   ...langGraphInterruptEvent(ev as LangGraphInterruptEvent),

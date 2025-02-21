@@ -13,6 +13,7 @@ import telemetry from "../telemetry-client";
 import { MetaEventInput } from "../../graphql/inputs/meta-event.input";
 import { MetaEventName } from "../../graphql/types/meta-events.type";
 import { RunsStreamPayload } from "@langchain/langgraph-sdk/dist/types";
+import { parseJson } from "@copilotkit/shared";
 
 type State = Record<string, any>;
 
@@ -24,6 +25,7 @@ interface ExecutionArgs extends Omit<LangGraphPlatformEndpoint, "agents"> {
   nodeName: string;
   messages: Message[];
   state: State;
+  configurable?: Record<string, any>;
   properties: CopilotRequestContextProperties;
   actions: ExecutionAction[];
   logger: Logger;
@@ -87,6 +89,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
     agent,
     nodeName: initialNodeName,
     state: initialState,
+    configurable,
     messages,
     actions,
     logger,
@@ -162,12 +165,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
   }
   if (lgInterruptMetaEvent?.response) {
     let response = lgInterruptMetaEvent.response;
-    try {
-      payload.command = { resume: JSON.parse(response) };
-      // In case of unparsable string, we keep the event as is
-    } catch (e) {
-      payload.command = { resume: response };
-    }
+    payload.command = { resume: parseJson(response, response) };
   }
 
   if (mode === "continue" && !activeInterruptEvent) {
@@ -202,6 +200,9 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
   }
   const assistantId = retrievedAssistant.assistant_id;
 
+  if (configurable) {
+    await client.assistants.update(assistantId, { config: { configurable } });
+  }
   const graphInfo = await client.assistants.getGraph(assistantId);
 
   let streamingStateExtractor = new StreamingStateExtractor([]);

@@ -17,5 +17,14 @@
     "tailwind-config": "1.4.6",
     "tsconfig": "1.4.6"
   },
-  "changesets": []
+  "changesets": [
+    "chilly-rats-bow",
+    "dirty-scissors-wash",
+    "healthy-foxes-serve",
+    "heavy-owls-relax",
+    "polite-falcons-melt",
+    "proud-dingos-poke",
+    "sharp-bikes-develop",
+    "tiny-donkeys-speak"
+  ]
 }
