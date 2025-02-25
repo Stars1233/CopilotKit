@@ -54,9 +54,22 @@ export function Mailer() {
         name: "the_email",
       },
     ],
-
     handler: async ({ the_email }) => {
-      const result = window.confirm(the_email);
+      return { emailContent: the_email };
+    },
+  });
+
+  useCopilotAction({
+    name: "DisplayEmail",
+    pairedAction: 'EmailTool',
+    parameters: [
+      {
+        name: "emailContent",
+      },
+    ],
+
+    handler: async ({ emailContent }) => {
+      const result = window.confirm(emailContent);
       const action = result ? "SEND" : "CANCEL";
       setMessageState(action);
       return action;
@@ -64,7 +77,12 @@ export function Mailer() {
   });
 
   useLangGraphInterrupt({
-    render: ({ event, resolve }) => <InterruptForm event={event} resolve={resolve} />
+    render: ({ event, resolve }) => <InterruptForm event={event} resolve={resolve} />,
+    enabled: ({ eventValue, agentMetadata }) => {
+      return eventValue === "Please provide a sender name which will appear in the email"
+          && agentMetadata.agentName === 'email_agent'
+          && agentMetadata.nodeName === 'email_node';
+    }
   });
 
   return (

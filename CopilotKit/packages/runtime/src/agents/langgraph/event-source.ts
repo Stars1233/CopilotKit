@@ -20,6 +20,7 @@ interface LangGraphEventWithState {
   lastToolCallId: string | null;
   lastToolCallName: string | null;
   currentContent: string | null;
+  processedToolCallIds: Set<string>;
 }
 
 export class RemoteLangGraphEventSource {
@@ -87,11 +88,20 @@ export class RemoteLangGraphEventSource {
             acc.lastMessageId = this.getCurrentMessageId(event) ?? acc.lastMessageId;
             const toolCallChunks = this.getCurrentToolCallChunks(event) ?? [];
             const responseMetadata = this.getResponseMetadata(event);
+            // Check if a given event is a tool call
+            const toolCallCheck = toolCallChunks && toolCallChunks.length > 0;
+            let isToolCallEnd = responseMetadata?.finish_reason === "tool_calls";
 
             acc.isToolCallStart = toolCallChunks.some((chunk: any) => chunk.name && chunk.id);
             acc.isMessageStart = prevMessageId !== acc.lastMessageId && !acc.isToolCallStart;
-            acc.isToolCall = toolCallChunks && toolCallChunks.length > 0;
-            acc.isToolCallEnd = responseMetadata?.finish_reason === "tool_calls";
+
+            let previousRoundHadToolCall = acc.isToolCall;
+            acc.isToolCall = toolCallCheck;
+            // Previous "acc.isToolCall" was set but now it won't pass the check, it means the tool call just ended.
+            if (previousRoundHadToolCall && !toolCallCheck) {
+              isToolCallEnd = true;
+            }
+            acc.isToolCallEnd = isToolCallEnd;
             acc.isMessageEnd = responseMetadata?.finish_reason === "stop";
             ({ name: acc.lastToolCallName, id: acc.lastToolCallId } = toolCallChunks.find(
               (chunk: any) => chunk.name && chunk.id,
@@ -112,6 +122,7 @@ export class RemoteLangGraphEventSource {
           lastToolCallId: null,
           lastToolCallName: null,
           currentContent: null,
+          processedToolCallIds: new Set<string>(),
         } as LangGraphEventWithState,
       ),
       mergeMap((acc): RuntimeEvent[] => {
@@ -148,9 +159,13 @@ export class RemoteLangGraphEventSource {
 
         // Tool call ended: emit ActionExecutionEnd
         if (
-          responseMetadata?.finish_reason === "tool_calls" &&
-          this.shouldEmitToolCall(shouldEmitToolCalls, acc.lastToolCallName)
+          acc.isToolCallEnd &&
+          this.shouldEmitToolCall(shouldEmitToolCalls, acc.lastToolCallName) &&
+          acc.lastToolCallId &&
+          !acc.processedToolCallIds.has(acc.lastToolCallId)
         ) {
+          acc.processedToolCallIds.add(acc.lastToolCallId);
+
           events.push({
             type: RuntimeEventTypes.ActionExecutionEnd,
             actionExecutionId: acc.lastToolCallId,
@@ -158,7 +173,7 @@ export class RemoteLangGraphEventSource {
         }
 
         // Message ended: emit TextMessageEnd
-        if (responseMetadata?.finish_reason === "stop" && shouldEmitMessages) {
+        else if (responseMetadata?.finish_reason === "stop" && shouldEmitMessages) {
           events.push({
             type: RuntimeEventTypes.TextMessageEnd,
             messageId: acc.lastMessageId,
@@ -236,6 +251,7 @@ export class RemoteLangGraphEventSource {
             }
             // Message started: emit TextMessageStart
             else if (acc.isMessageStart && shouldEmitMessages) {
+              acc.processedToolCallIds.clear();
               events.push({
                 type: RuntimeEventTypes.TextMessageStart,
                 messageId: acc.lastMessageId,
