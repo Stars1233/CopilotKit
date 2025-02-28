@@ -1,5 +1,141 @@
 # @copilotkit/runtime
 
+## 1.7.0-next.0
+
+### Minor Changes
+
+- 082db7a: - CrewAI support
+
+### Patch Changes
+
+- 082db7a: - Added RemoteAgentAdapter and implemented CopilotKit (protocol & events).
+  - Integrated CrewAI (with a prototype, HITL, event system, and chat/demo tweaks).
+  - Updated docs and cleaned up code (fixing stdout issues, restricting Python version, and streamlining demos).
+  - @copilotkit/shared@1.7.0-next.0
+
+## 1.6.0
+
+### Minor Changes
+
+- fea916f: - feat: support input and output schema of langgraph
+  - docs: add input output schema docs
+- 7d061d9: - feat(configurable): execute langgraph with user config
+
+### Patch Changes
+
+- 543f703: - fix: refrain from processing same tool end several times
+  - fix: do not register runtime set action when there are remote endpoints
+- 090203d: - fix: use tryMap method to filter out possibly invalid items
+- 1bb9ca2: - fix(coagents): don't fail when LangSmith API key is missing
+  - fix(coagents): don't check for langsmithApiKey in resolveEndpointType
+- 4ddb6d2: - fix: add class validator to dependencies
+- d07f49c: - fix(runtime): fix execution of runtime set backend action handlers
+- 45a3e10: - feat: support latest openai api
+  - chore: update all openai dependencies to use latest
+  - feat: update adapters using openai API
+- 68f7b65: - handle parsing in fail-safe fashion
+- Updated dependencies [090203d]
+  - @copilotkit/shared@1.6.0
+
+## 1.6.0-next.12
+
+### Patch Changes
+
+- 1bb9ca2: - fix(coagents): don't fail when LangSmith API key is missing
+  - fix(coagents): don't check for langsmithApiKey in resolveEndpointType
+  - @copilotkit/shared@1.6.0-next.12
+
+## 1.6.0-next.11
+
+### Patch Changes
+
+- @copilotkit/shared@1.6.0-next.11
+
+## 1.6.0-next.10
+
+### Patch Changes
+
+- 543f703: - fix: refrain from processing same tool end several times
+  - fix: do not register runtime set action when there are remote endpoints
+  - @copilotkit/shared@1.6.0-next.10
+
+## 1.6.0-next.9
+
+### Patch Changes
+
+- d07f49c: - fix(runtime): fix execution of runtime set backend action handlers
+  - @copilotkit/shared@1.6.0-next.9
+
+## 1.6.0-next.8
+
+### Minor Changes
+
+- fea916f: - feat: support input and output schema of langgraph
+  - docs: add input output schema docs
+
+### Patch Changes
+
+- @copilotkit/shared@1.6.0-next.8
+
+## 1.6.0-next.7
+
+### Patch Changes
+
+- @copilotkit/shared@1.6.0-next.7
+
+## 1.6.0-next.6
+
+### Patch Changes
+
+- 45a3e10: - feat: support latest openai api
+  - chore: update all openai dependencies to use latest
+  - feat: update adapters using openai API
+  - @copilotkit/shared@1.6.0-next.6
+
+## 1.6.0-next.5
+
+### Patch Changes
+
+- 090203d: - fix: use tryMap method to filter out possibly invalid items
+- Updated dependencies [090203d]
+  - @copilotkit/shared@1.6.0-next.5
+
+## 1.6.0-next.4
+
+### Patch Changes
+
+- 68f7b65: - handle parsing in fail-safe fashion
+  - @copilotkit/shared@1.6.0-next.4
+
+## 1.6.0-next.3
+
+### Patch Changes
+
+- 4ddb6d2: - fix: add class validator to dependencies
+  - @copilotkit/shared@1.6.0-next.3
+
+## 1.6.0-next.2
+
+### Patch Changes
+
+- @copilotkit/shared@1.6.0-next.2
+
+## 1.6.0-next.1
+
+### Patch Changes
+
+- @copilotkit/shared@1.6.0-next.1
+
+## 1.6.0-next.0
+
+### Minor Changes
+
+- 7d061d9: - feat(configurable): execute langgraph with user config
+
+### Patch Changes
+
+- @copilotkit/shared@1.6.0-next.0
+
 ## 1.5.20
 
 ### Patch Changes

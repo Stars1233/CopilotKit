@@ -7,12 +7,18 @@ import { useState } from "react";
 import { useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import { useLangGraphInterrupt } from "@copilotkit/react-core";
 
-const InterruptForm = ({ event, resolve }: { event: { value: string }, resolve: (value: string) => void }) => {
+const InterruptForm = ({
+  event,
+  resolve,
+}: {
+  event: { value: string };
+  resolve: (value: string) => void;
+}) => {
   const [name, setName] = useState<string>("");
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="text-lg font-medium">{event.value}</div>
-      <input 
+      <input
         type="text"
         placeholder="Your name"
         className="border p-2 rounded"
@@ -20,7 +26,7 @@ const InterruptForm = ({ event, resolve }: { event: { value: string }, resolve: 
         onChange={(e) => setName(e.target.value)}
       />
       <button
-        onClick={() => resolve(name)} 
+        onClick={() => resolve(name)}
         className="bg-blue-500 text-white px-4 py-2 rounded"
       >
         Submit
@@ -44,6 +50,9 @@ export function Mailer() {
     initialState: {
       model,
     },
+    configurable: {
+      authToken: 'exampleToken'
+    }
   });
 
   useCopilotAction({
@@ -54,9 +63,22 @@ export function Mailer() {
         name: "the_email",
       },
     ],
-
     handler: async ({ the_email }) => {
-      const result = window.confirm(the_email);
+      return { emailContent: the_email };
+    },
+  });
+
+  useCopilotAction({
+    name: "DisplayEmail",
+    pairedAction: 'EmailTool',
+    parameters: [
+      {
+        name: "emailContent",
+      },
+    ],
+
+    handler: async ({ emailContent }) => {
+      const result = window.confirm(emailContent);
       const action = result ? "SEND" : "CANCEL";
       setMessageState(action);
       return action;
@@ -64,7 +86,17 @@ export function Mailer() {
   });
 
   useLangGraphInterrupt({
-    render: ({ event, resolve }) => <InterruptForm event={event} resolve={resolve} />
+    render: ({ event, resolve }) => (
+      <InterruptForm event={event} resolve={resolve} />
+    ),
+    enabled: ({ eventValue, agentMetadata }) => {
+      return (
+        eventValue ===
+          "Please provide a sender name which will appear in the email" &&
+        agentMetadata.agentName === "email_agent" &&
+        agentMetadata.nodeName === "email_node"
+      );
+    },
   });
 
   return (

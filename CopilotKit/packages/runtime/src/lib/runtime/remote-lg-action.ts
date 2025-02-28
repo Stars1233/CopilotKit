@@ -1,4 +1,4 @@
-import { Client as LangGraphClient } from "@langchain/langgraph-sdk";
+import { AssistantGraph, Client as LangGraphClient, GraphSchema } from "@langchain/langgraph-sdk";
 import { createHash } from "node:crypto";
 import { isValidUUID, randomUUID } from "@copilotkit/shared";
 import { parse as parsePartialJson } from "partial-json";
@@ -13,6 +13,7 @@ import telemetry from "../telemetry-client";
 import { MetaEventInput } from "../../graphql/inputs/meta-event.input";
 import { MetaEventName } from "../../graphql/types/meta-events.type";
 import { RunsStreamPayload } from "@langchain/langgraph-sdk/dist/types";
+import { parseJson } from "@copilotkit/shared";
 
 type State = Record<string, any>;
 
@@ -24,6 +25,7 @@ interface ExecutionArgs extends Omit<LangGraphPlatformEndpoint, "agents"> {
   nodeName: string;
   messages: Message[];
   state: State;
+  configurable?: Record<string, any>;
   properties: CopilotRequestContextProperties;
   actions: ExecutionAction[];
   logger: Logger;
@@ -87,6 +89,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
     agent,
     nodeName: initialNodeName,
     state: initialState,
+    configurable,
     messages,
     actions,
     logger,
@@ -162,12 +165,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
   }
   if (lgInterruptMetaEvent?.response) {
     let response = lgInterruptMetaEvent.response;
-    try {
-      payload.command = { resume: JSON.parse(response) };
-      // In case of unparsable string, we keep the event as is
-    } catch (e) {
-      payload.command = { resume: response };
-    }
+    payload.command = { resume: parseJson(response, response) };
   }
 
   if (mode === "continue" && !activeInterruptEvent) {
@@ -202,7 +200,19 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
   }
   const assistantId = retrievedAssistant.assistant_id;
 
+  if (configurable) {
+    await client.assistants.update(assistantId, { config: { configurable } });
+  }
   const graphInfo = await client.assistants.getGraph(assistantId);
+  const graphSchema = await client.assistants.getSchemas(assistantId);
+  const schemaKeys = getSchemaKeys(graphSchema);
+
+  // Do not input keys that are not part of the input schema
+  if (payload.input && schemaKeys.input) {
+    payload.input = Object.fromEntries(
+      Object.entries(payload.input).filter(([key]) => schemaKeys.input.includes(key)),
+    );
+  }
 
   let streamingStateExtractor = new StreamingStateExtractor([]);
   let prevNodeName = null;
@@ -329,6 +339,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
             state: manuallyEmittedState,
             running: true,
             active: true,
+            schemaKeys,
           }),
         );
         continue;
@@ -379,6 +390,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
             state,
             running: true,
             active: !exitingNode,
+            schemaKeys,
           }),
         );
       }
@@ -403,6 +415,7 @@ async function streamEvents(controller: ReadableStreamDefaultController, args: E
         running: !shouldExit,
         active: false,
         includeMessages: true,
+        schemaKeys,
       }),
     );
 
@@ -426,6 +439,7 @@ function getStateSyncEvent({
   running,
   active,
   includeMessages = false,
+  schemaKeys,
 }: {
   threadId: string;
   runId: string;
@@ -435,6 +449,7 @@ function getStateSyncEvent({
   running: boolean;
   active: boolean;
   includeMessages?: boolean;
+  schemaKeys: { input: string[] | null; output: string[] | null };
 }): string {
   if (!includeMessages) {
     state = Object.keys(state).reduce((acc, key) => {
@@ -448,6 +463,13 @@ function getStateSyncEvent({
       ...state,
       messages: langchainMessagesToCopilotKit(state.messages || []),
     };
+  }
+
+  // Do not emit state keys that are not part of the output schema
+  if (schemaKeys.output) {
+    state = Object.fromEntries(
+      Object.entries(state).filter(([key]) => schemaKeys.output.includes(key)),
+    );
   }
 
   return (
@@ -737,4 +759,15 @@ function copilotkitMessagesToLangChain(messages: Message[]): LangGraphPlatformMe
   }
 
   return result;
+}
+
+function getSchemaKeys(graphSchema: GraphSchema) {
+  const CONSTANT_KEYS = ["messages", "copilotkit"];
+  const inputSchema = Object.keys(graphSchema.input_schema.properties);
+  const outputSchema = Object.keys(graphSchema.output_schema.properties);
+
+  return {
+    input: inputSchema && inputSchema.length ? [...inputSchema, ...CONSTANT_KEYS] : null,
+    output: outputSchema && outputSchema.length ? [...outputSchema, ...CONSTANT_KEYS] : null,
+  };
 }

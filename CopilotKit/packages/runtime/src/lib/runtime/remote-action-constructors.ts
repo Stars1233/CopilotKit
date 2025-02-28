@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   CopilotKitEndpoint,
-  LangGraphAgentHandlerParams,
+  RemoteAgentHandlerParams,
   RemoteActionInfoResponse,
   LangGraphPlatformEndpoint,
 } from "./remote-actions";
@@ -10,14 +10,21 @@ import { Logger } from "pino";
 import { Message } from "../../graphql/types/converted";
 import { AgentStateInput } from "../../graphql/inputs/agent-state.input";
 import { Observable, ReplaySubject } from "rxjs";
-import { RuntimeEvent } from "../../service-adapters/events";
+import {
+  RuntimeEvent,
+  RuntimeEventSource,
+  RuntimeEventSubject,
+} from "../../service-adapters/events";
 import telemetry from "../telemetry-client";
 import { RemoteLangGraphEventSource } from "../../agents/langgraph/event-source";
 import { Action } from "@copilotkit/shared";
 import { LangGraphEvent } from "../../agents/langgraph/events";
 import { execute } from "./remote-lg-action";
 import { CopilotKitError, CopilotKitLowLevelError } from "@copilotkit/shared";
+import { writeJsonLineResponseToEventStream } from "../streaming";
 import { CopilotKitApiDiscoveryError, ResolvedCopilotKitError } from "@copilotkit/shared";
+import { parseJson, tryMap } from "@copilotkit/shared";
+import { ActionInput } from "../../graphql/inputs/action.input";
 
 export function constructLGCRemoteAction({
   endpoint,
@@ -37,14 +44,14 @@ export function constructLGCRemoteAction({
     description: agent.description,
     parameters: [],
     handler: async (_args: any) => {},
-    langGraphAgentHandler: async ({
+    remoteAgentHandler: async ({
       name,
       actionInputsWithoutAgents,
       threadId,
       nodeName,
       additionalMessages = [],
       metaEvents,
-    }: LangGraphAgentHandlerParams): Promise<Observable<RuntimeEvent>> => {
+    }: RemoteAgentHandlerParams): Promise<Observable<RuntimeEvent>> => {
       logger.debug({ actionName: agent.name }, "Executing LangGraph Platform agent");
 
       telemetry.capture("oss.runtime.remote_action_executed", {
@@ -55,10 +62,12 @@ export function constructLGCRemoteAction({
       });
 
       let state = {};
+      let configurable = {};
       if (agentStates) {
-        const jsonState = agentStates.find((state) => state.agentName === name)?.state;
+        const jsonState = agentStates.find((state) => state.agentName === name);
         if (jsonState) {
-          state = JSON.parse(jsonState);
+          state = parseJson(jsonState.state, {});
+          configurable = parseJson(jsonState.configurable, {});
         }
       }
 
@@ -72,17 +81,18 @@ export function constructLGCRemoteAction({
           nodeName,
           messages: [...messages, ...additionalMessages],
           state,
+          configurable,
           properties: graphqlContext.properties,
-          actions: actionInputsWithoutAgents.map((action) => ({
+          actions: tryMap(actionInputsWithoutAgents, (action: ActionInput) => ({
             name: action.name,
             description: action.description,
-            parameters: JSON.parse(action.jsonSchema) as string,
+            parameters: JSON.parse(action.jsonSchema),
           })),
           metaEvents,
         });
 
         const eventSource = new RemoteLangGraphEventSource();
-        streamResponse(response, eventSource.eventStream$);
+        writeJsonLineResponseToEventStream(response, eventSource.eventStream$);
         return eventSource.processLangGraphEvents();
       } catch (error) {
         logger.error(
@@ -95,6 +105,11 @@ export function constructLGCRemoteAction({
   }));
 
   return [...agents];
+}
+
+export enum RemoteAgentType {
+  LangGraph = "langgraph",
+  CrewAI = "crewai",
 }
 
 export function constructRemoteActions({
@@ -178,14 +193,14 @@ export function constructRemoteActions({
         parameters: [],
         handler: async (_args: any) => {},
 
-        langGraphAgentHandler: async ({
+        remoteAgentHandler: async ({
           name,
           actionInputsWithoutAgents,
           threadId,
           nodeName,
           additionalMessages = [],
           metaEvents,
-        }: LangGraphAgentHandlerParams): Promise<Observable<RuntimeEvent>> => {
+        }: RemoteAgentHandlerParams): Promise<Observable<RuntimeEvent>> => {
           logger.debug({ actionName: agent.name }, "Executing remote agent");
 
           const headers = createHeaders(onBeforeRequest, graphqlContext);
@@ -196,10 +211,12 @@ export function constructRemoteActions({
           });
 
           let state = {};
+          let configurable = {};
           if (agentStates) {
-            const jsonState = agentStates.find((state) => state.agentName === name)?.state;
+            const jsonState = agentStates.find((state) => state.agentName === name);
             if (jsonState) {
-              state = JSON.parse(jsonState);
+              state = parseJson(jsonState.state, {});
+              configurable = parseJson(jsonState.configurable, {});
             }
           }
 
@@ -214,8 +231,9 @@ export function constructRemoteActions({
                 nodeName,
                 messages: [...messages, ...additionalMessages],
                 state,
+                configurable,
                 properties: graphqlContext.properties,
-                actions: actionInputsWithoutAgents.map((action) => ({
+                actions: tryMap(actionInputsWithoutAgents, (action: ActionInput) => ({
                   name: action.name,
                   description: action.description,
                   parameters: JSON.parse(action.jsonSchema),
@@ -239,9 +257,17 @@ export function constructRemoteActions({
               });
             }
 
-            const eventSource = new RemoteLangGraphEventSource();
-            streamResponse(response.body!, eventSource.eventStream$);
-            return eventSource.processLangGraphEvents();
+            if (agent.type === RemoteAgentType.LangGraph) {
+              const eventSource = new RemoteLangGraphEventSource();
+              writeJsonLineResponseToEventStream(response.body!, eventSource.eventStream$);
+              return eventSource.processLangGraphEvents();
+            } else if (agent.type === RemoteAgentType.CrewAI) {
+              const eventStream$ = new RuntimeEventSubject();
+              writeJsonLineResponseToEventStream(response.body!, eventStream$);
+              return eventStream$;
+            } else {
+              throw new Error("Unsupported agent type");
+            }
           } catch (error) {
             if (error instanceof CopilotKitError) {
               throw error;
@@ -253,64 +279,6 @@ export function constructRemoteActions({
     : [];
 
   return [...actions, ...agents];
-}
-
-async function streamResponse(
-  response: ReadableStream<Uint8Array>,
-  eventStream$: ReplaySubject<LangGraphEvent>,
-) {
-  const reader = response.getReader();
-  const decoder = new TextDecoder();
-  let buffer = [];
-
-  function flushBuffer() {
-    const currentBuffer = buffer.join("");
-    if (currentBuffer.trim().length === 0) {
-      return;
-    }
-    const parts = currentBuffer.split("\n");
-    if (parts.length === 0) {
-      return;
-    }
-
-    const lastPartIsComplete = currentBuffer.endsWith("\n");
-
-    // truncate buffer
-    buffer = [];
-
-    if (!lastPartIsComplete) {
-      // put back the last part
-      buffer.push(parts.pop());
-    }
-
-    parts
-      .map((part) => part.trim())
-      .filter((part) => part != "")
-      .forEach((part) => {
-        eventStream$.next(JSON.parse(part));
-      });
-  }
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (!done) {
-        buffer.push(decoder.decode(value, { stream: true }));
-      }
-
-      flushBuffer();
-
-      if (done) {
-        break;
-      }
-    }
-  } catch (error) {
-    console.error("Error in stream", error);
-    eventStream$.error(error);
-    return;
-  }
-  eventStream$.complete();
 }
 
 export function createHeaders(
