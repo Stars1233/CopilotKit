@@ -1,16 +1,16 @@
 {
   "title": "Guides",
   "pages": [
+    "custom-look-and-feel",
     "connect-your-data",
     "generative-ui",
     "frontend-actions",
     "backend-actions",
+    "custom-ai-assistant-behavior",
     "authenticated-actions",
     "guardrails",
-    "custom-ai-assistant-behavior",
     "copilot-suggestions",
     "bring-your-own-llm",
-    "custom-look-and-feel",
     "copilot-textarea",
     "self-hosting",
     "messages-localstorage"

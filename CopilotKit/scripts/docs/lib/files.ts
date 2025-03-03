@@ -112,7 +112,8 @@ export const REFERENCE_DOCS: ReferenceDocConfiguration[] = [
     sourcePath: "packages/react-core/src/hooks/use-coagent-state-render.ts",
     destinationPath: "docs/content/docs/reference/hooks/useCoAgentStateRender.mdx",
     hook: "useCoAgentStateRender",
-    description: "The useCoAgentStateRender hook allows you to render the state of a coagent.",
+    description:
+      "The useCoAgentStateRender hook allows you to render the state of the agent in the chat.",
   },
   {
     sourcePath: "packages/react-core/src/hooks/use-coagent.ts",
@@ -121,7 +122,15 @@ export const REFERENCE_DOCS: ReferenceDocConfiguration[] = [
     description:
       "The useCoAgent hook allows you to share state bidirectionally between your application and the agent.",
   },
+  {
+    sourcePath: "packages/react-core/src/hooks/use-copilot-additional-instructions.ts",
+    destinationPath: "docs/content/docs/reference/hooks/useCopilotAdditionalInstructions.mdx",
+    hook: "useCopilotAdditionalInstructions",
+    description:
+      "The useCopilotAdditionalInstructions hook allows you to provide additional instructions to the agent.",
+  },
   /* SDKs */
+
   {
     sourcePath: "../sdk-python/copilotkit/langgraph.py",
     destinationPath: "docs/content/docs/reference/sdk/python/LangGraph.mdx",
@@ -137,11 +146,34 @@ export const REFERENCE_DOCS: ReferenceDocConfiguration[] = [
     ],
   },
   {
+    sourcePath: "../sdk-python/copilotkit/crewai.py",
+    destinationPath: "docs/content/docs/reference/sdk/python/CrewAI.mdx",
+    title: "CrewAI SDK",
+    description:
+      "The CopilotKit CrewAI SDK for Python allows you to build and run CrewAI agents with CopilotKit.",
+    pythonSymbols: [
+      "copilotkit_emit_state",
+      "copilotkit_predict_state",
+      "copilotkit_exit",
+      "copilotkit_emit_message",
+      "copilotkit_emit_tool_call",
+    ],
+  },
+
+  /* Agents */
+  {
     sourcePath: "../sdk-python/copilotkit/langgraph_agent.py",
     destinationPath: "docs/content/docs/reference/sdk/python/LangGraphAgent.mdx",
     title: "LangGraphAgent",
     description: "LangGraphAgent lets you define your agent for use with CopilotKit.",
     pythonSymbols: ["LangGraphAgent", "CopilotKitConfig"],
+  },
+  {
+    sourcePath: "../sdk-python/copilotkit/crewai_agent.py",
+    destinationPath: "docs/content/docs/reference/sdk/python/CrewAIAgent.mdx",
+    title: "CrewAIAgent",
+    description: "CrewAIAgent lets you define your agent for use with CopilotKit.",
+    pythonSymbols: ["CrewAIAgent", "CopilotKitConfig"],
   },
   {
     sourcePath: "../sdk-python/copilotkit/sdk.py",
